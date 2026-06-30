@@ -1,7 +1,13 @@
 # 部署指南 — LiteLLM on EKS (CDK)
 
 > **这是部署的总入口。** 从零部署到一个全新 AWS 账号,从头读到尾即可。
-> 占位符(`<REGION>` / `<your-domain>` / `<ACCOUNT_ID>` 等)替换成你自己的值。
+>
+> 📌 **关于占位符(`<ACCOUNT_ID>` / `<HOSTED_ZONE_ID>` / `<your-domain>` 等)**:
+> 主流程**无需手动替**它们。`./scripts/deploy.sh` 会用你**当前 AWS 凭证**自动拿 account,
+> `init-env.ts` 会自动发现你账号里的 hosted zone / 可用 AZ / Postgres 版本 / Bedrock profiles
+> 并写进 `cdk.context.json`。你**唯一要提供的是 `--domain` 和 `--region`**。文档里的 `<...>`
+> 是给人读的示例值。**只有可选的 AgentCore websearch 特性**(见 §可选特性)需要你填自己的
+> gateway 值——那是该特性预期的手动配置。
 >
 > 各步的**深入细节 / 排错**在专门文档里,本文会在对应位置给出链接:
 > - [`docs/01-prerequisites-and-deploy.md`](docs/01-prerequisites-and-deploy.md) — 前置条件与参数发现的完整说明

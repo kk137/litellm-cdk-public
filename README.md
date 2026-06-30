@@ -59,6 +59,8 @@ This reproduction follows a few deliberate principles — adjust per environment
 ## 仓库结构地图
 
 > 🚀 **要部署?直接看 [`DEPLOYMENT.md`](DEPLOYMENT.md)** —— 部署总入口,从头读到尾即可。
+>
+> 📌 文档里的 `<ACCOUNT_ID>` / `<HOSTED_ZONE_ID>` 等占位符**主流程无需手动替** —— `deploy.sh` + `init-env.ts` 会用你自己的 AWS 凭证自动发现并写进 `cdk.context.json`,你只需给 `--domain` / `--region`。详见 DEPLOYMENT.md 顶部说明。
 
 **顶层布局:**
 
