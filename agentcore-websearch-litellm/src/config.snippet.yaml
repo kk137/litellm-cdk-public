@@ -1,0 +1,44 @@
+# =============================================================================
+# LiteLLM config.yaml 集成片段 —— 把 websearch 后端从 SearXNG 换成 AgentCore
+# =============================================================================
+# 说明：方案 C2a。用自定义 callback 类替换内置 websearch_interception callback。
+# 自定义类继承 WebSearchInterceptionLogger，只 override _execute_search。
+#
+# ⚠️ 不要同时保留内置 "websearch_interception" 和本自定义 callback —— 二者都拦
+#    截 bedrock 的 web_search，会冲突。本片段用自定义类「取代」内置那一行。
+# =============================================================================
+
+litellm_settings:
+  cache: true
+  # ... (其余 cache_params 等保持你现有配置不变) ...
+
+  callbacks:
+    - prometheus
+    # - websearch_interception          # ← 移除/注释掉内置的（原来接 SearXNG）
+    - agentcore_websearch.agentcore_websearch_logger   # ← 换成自定义实例
+    - s3_v2
+
+  # websearch_interception_params 不再需要（自定义类在代码里自带 enabled_providers）。
+  # 若想保留 SearXNG 作为 fallback，见 docs/03-rollout-and-rollback.md。
+
+# search_tools: 这一段对 AgentCore 路径不再生效（AgentCore 不走 search_provider
+# 枚举）。可保留给将来回退 SearXNG 用，留着不影响 AgentCore。
+# search_tools:
+#   - search_tool_name: searxng-search
+#     litellm_params:
+#       search_provider: searxng
+#       api_base: http://searxng:8080
+
+# =============================================================================
+# 自定义 callback 模块如何被 LiteLLM 找到
+# =============================================================================
+# LiteLLM 通过 "模块名.实例名" 解析 callback。需保证 agentcore_websearch.py 在
+# Python import 路径上。两种做法（见 docs/02-deploy-to-eks.md）：
+#   A. 打进镜像：放到 /app 或某个已在 PYTHONPATH 的目录
+#   B. 用 ConfigMap 挂载 .py + 设 PYTHONPATH 指向挂载目录（无需改镜像，推荐先用这个验证）
+#
+# 环境变量（可选，覆盖代码默认值；建议在 deployment env 里显式设置 region）：
+#   AGENTCORE_WS_REGION=us-east-1        # 必须是 us-east-1（AgentCore 仅此区域）
+#   AGENTCORE_WS_MCP_URL=https://<AGENTCORE_GATEWAY_ID>.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp
+#   AGENTCORE_WS_TOOL_NAME=web-search-tool___WebSearch
+#   AGENTCORE_WS_MAX_RESULTS=10

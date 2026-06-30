@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiteLLM 搜索后端对比测试报告：AgentCore vs exa vs tavily vs
+SearXNG</title>
+<style>
+  :root{
+    --squid:#232F3E;
+    --aws-orange:#FF9900;
+    --link:#0073BB;
+    --text:#16191F;
+    --muted:#5F6B7A;
+    --rule:#E4E7EB;
+    --code-bg:#F7F8FA;
+    --note-bg:#F1F8FE;   --note-bd:#0073BB;
+    --warn-bg:#FFF6E5;   --warn-bd:#FF9900;
+    --ok-bg:#F0FAF2;     --ok-bd:#3DA55C;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:#fff;color:var(--text);
+    font-family:"Amazon Ember","Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased;
+  }
+  .topbar{background:var(--squid);height:8px}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px 80px}
+  header.post{padding:48px 0 24px;border-bottom:1px solid var(--rule);margin-bottom:8px}
+  header.post h1{
+    font-size:34px;line-height:1.3;font-weight:700;margin:0 0 16px;color:var(--squid);
+  }
+  .byline{color:var(--muted);font-size:14px}
+  .byline .tag{
+    display:inline-block;background:#F2F3F3;color:#414750;border-radius:3px;
+    padding:2px 10px;margin-right:6px;font-size:12px;
+  }
+  blockquote{
+    margin:24px 0;padding:14px 20px;background:var(--code-bg);
+    border-left:4px solid var(--aws-orange);color:#3b424d;border-radius:0 4px 4px 0;
+  }
+  blockquote p{margin:6px 0}
+  h2{
+    font-size:25px;font-weight:700;color:var(--squid);margin:48px 0 14px;
+    padding-bottom:8px;border-bottom:2px solid var(--rule);scroll-margin-top:20px;
+  }
+  h3{font-size:20px;font-weight:600;color:#1b2733;margin:30px 0 10px}
+  p{margin:14px 0}
+  a{color:var(--link);text-decoration:none}
+  a:hover{text-decoration:underline}
+  strong{color:#111}
+  ul,ol{padding-left:26px}
+  li{margin:6px 0}
+  hr{border:0;border-top:1px solid var(--rule);margin:40px 0}
+  /* code */
+  code{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    background:var(--code-bg);border:1px solid var(--rule);border-radius:3px;
+    padding:1px 5px;font-size:90%;color:#bf3e2b;
+  }
+  pre{
+    background:var(--code-bg);border:1px solid var(--rule);border-radius:6px;
+    padding:16px 18px;overflow:auto;line-height:1.55;margin:18px 0;
+  }
+  pre code{background:none;border:0;padding:0;color:#1b2733;font-size:13.5px}
+  /* tables */
+  table{border-collapse:collapse;width:100%;margin:20px 0;font-size:14.5px}
+  th,td{border:1px solid var(--rule);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#FAFAFA;font-weight:600;color:var(--squid)}
+  tr:nth-child(even) td{background:#FCFCFD}
+  /* TOC */
+  .toc{
+    background:#FBFBFC;border:1px solid var(--rule);border-radius:8px;
+    padding:18px 22px;margin:28px 0 8px;
+  }
+  .toc-title{font-weight:700;color:var(--squid);margin-bottom:8px;font-size:15px}
+  .toc ol{margin:0;padding-left:22px}
+  .toc li{margin:3px 0}
+  /* callouts: 段落以 ℹ️ / ⚠️ / ✅ 开头时由 JS 包裹 */
+  .callout{border-radius:0 6px 6px 0;padding:12px 16px;margin:18px 0}
+  .callout.note{background:var(--note-bg);border-left:4px solid var(--note-bd)}
+  .callout.warn{background:var(--warn-bg);border-left:4px solid var(--warn-bd)}
+  .callout.ok{background:var(--ok-bg);border-left:4px solid var(--ok-bd)}
+  .imgcap{color:var(--muted);font-size:13px;text-align:center;margin:-8px 0 22px}
+  footer.post{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+<div class="wrap">
+<header class="post">
+  <h1>LiteLLM 搜索后端对比测试报告：AgentCore vs exa vs tavily vs
+SearXNG</h1>
+  <div class="byline">
+    <span class="tag">Amazon Bedrock</span>
+    <span class="tag">LiteLLM</span>
+    <span class="tag">AgentCore Web Search</span>
+    <span class="tag">EKS</span>
+    &nbsp;·&nbsp;技术实战
+  </div>
+</header>
+<nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <ul>
+  <li><a href="#1-测试目的与方法" id="toc-1-测试目的与方法">1.
+  测试目的与方法</a></li>
+  <li><a href="#2-延迟结果" id="toc-2-延迟结果">2. 延迟结果</a></li>
+  <li><a href="#3-效果结果gpt-55-盲评" id="toc-3-效果结果gpt-55-盲评">3.
+  效果结果（GPT-5.5 盲评）</a></li>
+  <li><a href="#4-综合画像" id="toc-4-综合画像">4. 综合画像</a></li>
+  <li><a href="#5-局限与解读重要" id="toc-5-局限与解读重要">5.
+  局限与解读（重要）</a></li>
+  <li><a href="#6-结论与选型建议" id="toc-6-结论与选型建议">6.
+  结论与选型建议</a></li>
+  </ul>
+</nav>
+<blockquote>
+<p>在 LiteLLM websearch interception 的 <code>_execute_search</code>
+位置，对四个搜索后端做<strong>延迟</strong>与
+<strong>效果</strong>横向实测。测试从生产环境的 LiteLLM Pod（新加坡
+ap-southeast-1）发起，反映真实链路。
+本报告为内部技术评估，不含密钥；测试日期 2026-06-23。</p>
+</blockquote>
+<h2 id="1-测试目的与方法">1. 测试目的与方法</h2>
+<h3 id="11-目的">1.1 目的</h3>
+<p>LiteLLM 通过 websearch interception 为 Bedrock Claude 补充 web
+搜索能力，搜索那一步收口在
+<code>_execute_search</code>。本测试回答：<strong>同一位置换不同搜索后端，延迟和效果各如何</strong>，为后端选型提供数据。</p>
+<h3 id="12-被测后端">1.2 被测后端</h3>
+<table>
+<thead>
+<tr>
+<th>后端</th>
+<th>调用方式</th>
+<th>部署位置</th>
+<th>鉴权</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>exa_ai</strong></td>
+<td><code>litellm.asearch(search_provider="exa_ai")</code></td>
+<td>境外托管 API</td>
+<td>API Key</td>
+</tr>
+<tr>
+<td><strong>tavily</strong></td>
+<td><code>litellm.asearch(search_provider="tavily")</code></td>
+<td>境外托管 API</td>
+<td>API Key</td>
+</tr>
+<tr>
+<td><strong>searxng</strong></td>
+<td><code>litellm.asearch(search_provider="searxng")</code></td>
+<td><strong>集群内自建</strong>（同区）</td>
+<td>无</td>
+</tr>
+<tr>
+<td><strong>agentcore</strong></td>
+<td>裸 SigV4 调 AgentCore MCP（C2a）</td>
+<td>AWS 托管 @ us-east-1</td>
+<td>AWS IAM / IRSA</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>_execute_search</code> 内部即
+<code>litellm.asearch(query, search_provider)</code>，故
+exa/tavily/searxng 用原生 provider、agentcore 用 C2a 自定义实现，三者在
+interception 中角色等价，对比公平。</p>
+</blockquote>
+<h3 id="13-测试条件">1.3 测试条件</h3>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>发起位置</td>
+<td>LiteLLM Pod @ EKS ap-southeast-1（生产同环境）</td>
+</tr>
+<tr>
+<td>query 集</td>
+<td>10 条，覆盖时效/事实/技术长尾/中文</td>
+</tr>
+<tr>
+<td>延迟样本</td>
+<td>每后端 × 每 query × 3 轮，warmup 2 轮丢弃</td>
+</tr>
+<tr>
+<td>结果条数</td>
+<td>统一请求 maxResults=10，取 top-5 评效果</td>
+</tr>
+<tr>
+<td>效果评审</td>
+<td>GPT-5.5（经本网关
+<code>/v1/responses</code>）<strong>盲评</strong>：匿名化 A/B/C/D +
+打乱顺序</td>
+</tr>
+<tr>
+<td>LiteLLM 版本</td>
+<td>v1.84.3</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-延迟结果">2. 延迟结果</h2>
+<p>每后端 30 次有效样本（10 query × 3 轮），单位 ms：</p>
+<table>
+<thead>
+<tr>
+<th>后端</th>
+<th>p50</th>
+<th>p95</th>
+<th>p99</th>
+<th>mean</th>
+<th>错误率</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>exa_ai</strong></td>
+<td><strong>232</strong></td>
+<td>339</td>
+<td>395</td>
+<td>247</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>tavily</strong></td>
+<td><strong>231</strong></td>
+<td>1136</td>
+<td>1333</td>
+<td>328</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>searxng</strong></td>
+<td><strong>560</strong></td>
+<td>961</td>
+<td>1141</td>
+<td>655</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>agentcore</strong></td>
+<td><strong>1680</strong></td>
+<td>1813</td>
+<td>1863</td>
+<td>1690</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>延迟排序：<strong>exa ≈ tavily（~230ms）&lt; searxng（560ms）&lt;
+agentcore（1680ms）</strong>。</p>
+<ul>
+<li>exa 最快且最稳（p95 仅 339ms）；tavily p50 相同但尾部抖动大（p95
+1136ms）。</li>
+<li>searxng 居中：同区零跨区，但要聚合多个上游引擎，处理偏慢。</li>
+<li>agentcore 最慢，主因是<strong>跨区</strong>（新加坡 Pod →
+us-east-1），且延迟极稳（p50≈p99），说明瓶颈是固定的网络距离而非服务抖动。</li>
+</ul>
+<h3 id="21-agentcore-延迟拆解跨区开销">2.1 AgentCore
+延迟拆解（跨区开销）</h3>
+<p>实测新加坡 Pod → us-east-1 端点：</p>
+<table>
+<thead>
+<tr>
+<th>测量</th>
+<th>p50</th>
+<th>min</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCP 连接建立（≈1×RTT）</td>
+<td>231ms</td>
+<td><strong>217ms</strong></td>
+</tr>
+<tr>
+<td>TCP+TLS 握手（≈2–3×RTT）</td>
+<td>450ms</td>
+<td>432ms</td>
+</tr>
+</tbody>
+</table>
+<p>单程网络 RTT ≈
+<strong>217ms</strong>（符合新加坡↔︎美东物理距离）。AgentCore 单次 1680ms
+估算拆解：</p>
+<table>
+<thead>
+<tr>
+<th>组成</th>
+<th>估算</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCP+TLS 握手</td>
+<td>~450ms</td>
+<td>跨区，且 benchmark 每次新建连接（无连接复用）</td>
+</tr>
+<tr>
+<td>请求往返</td>
+<td>~217ms</td>
+<td>至少 1×RTT</td>
+</tr>
+<tr>
+<td>搜索服务本身</td>
+<td><strong>~1000ms</strong></td>
+<td>扣除网络后的 AgentCore 实际搜索耗时</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>结论</strong>：跨区网络占 AgentCore 总延迟约
+40%（~660ms）。若 LiteLLM 与 AgentCore <strong>同区</strong> （都在
+us-east-1）或<strong>复用连接</strong>，AgentCore
+延迟会显著下降（可省去每次 ~450ms 握手）。
+本测试每次新建连接，<strong>高估</strong>了 AgentCore 的握手成本。</p>
+</blockquote>
+<hr />
+<h2 id="3-效果结果gpt-55-盲评">3. 效果结果（GPT-5.5 盲评）</h2>
+<p>各维度 1–5 分（noise 维度：5=无噪声）。GPT-5.5
+在不知后端名、顺序打乱的前提下评分。</p>
+<table>
+<thead>
+<tr>
+<th>后端</th>
+<th>相关性</th>
+<th>时效性</th>
+<th>来源质量</th>
+<th>噪声(高=干净)</th>
+<th><strong>总均</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>exa_ai</strong></td>
+<td>4.50</td>
+<td>4.10</td>
+<td>4.60</td>
+<td>4.50</td>
+<td><strong>4.42</strong></td>
+</tr>
+<tr>
+<td><strong>tavily</strong></td>
+<td>3.80</td>
+<td>3.80</td>
+<td>3.50</td>
+<td>3.70</td>
+<td><strong>3.70</strong></td>
+</tr>
+<tr>
+<td><strong>agentcore</strong></td>
+<td>3.30</td>
+<td>3.70</td>
+<td>4.20</td>
+<td>3.50</td>
+<td><strong>3.67</strong></td>
+</tr>
+<tr>
+<td><strong>searxng</strong></td>
+<td>2.50</td>
+<td>3.00</td>
+<td>3.10</td>
+<td>2.00</td>
+<td><strong>2.65</strong></td>
+</tr>
+</tbody>
+</table>
+<p>效果排序：<strong>exa（4.42）&gt; tavily（3.70）≈
+agentcore（3.67）&gt; searxng（2.65）</strong>。</p>
+<ul>
+<li><strong>exa</strong> 全面领先，相关性/来源/低噪声都最高。</li>
+<li><strong>tavily ≈ agentcore</strong> 几乎打平。agentcore
+<strong>来源质量 4.20 仅次于 exa</strong>（结果几乎全是 AWS
+官方页面），但相关性 3.30 偏低拖累总分。</li>
+<li><strong>searxng</strong> 垫底，尤其噪声 2.0 最差——多个 query
+中混入无关新闻站/疑似垃圾页（含受 Pod 出口地理影响的本地化结果）。</li>
+</ul>
+<h3 id="31-逐-query-总均分">3.1 逐 query 总均分</h3>
+<table>
+<thead>
+<tr>
+<th>query</th>
+<th>exa_ai</th>
+<th>tavily</th>
+<th>searxng</th>
+<th>agentcore</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latest AWS Bedrock announcements June 2026</td>
+<td>5.0</td>
+<td>4.8</td>
+<td>2.0</td>
+<td>4.5</td>
+</tr>
+<tr>
+<td>2026 年 AWS re:Inforce 大会有哪些新发布</td>
+<td>3.2</td>
+<td>2.5</td>
+<td>1.0</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>newest Claude model released 2026</td>
+<td>5.0</td>
+<td>2.5</td>
+<td>1.8</td>
+<td>4.5</td>
+</tr>
+<tr>
+<td>what is Amazon Bedrock AgentCore</td>
+<td>4.8</td>
+<td>3.8</td>
+<td>2.8</td>
+<td>4.2</td>
+</tr>
+<tr>
+<td>how does AWS IRSA work for EKS pods</td>
+<td>4.5</td>
+<td>3.2</td>
+<td>2.2</td>
+<td>4.8</td>
+</tr>
+<tr>
+<td>LiteLLM websearch interception non-streaming</td>
+<td>4.2</td>
+<td>4.2</td>
+<td>4.2</td>
+<td>2.5</td>
+</tr>
+<tr>
+<td>mcp-proxy-for-aws sigv4 authentication</td>
+<td>4.2</td>
+<td>4.0</td>
+<td>2.8</td>
+<td>3.8</td>
+</tr>
+<tr>
+<td>Amazon Bedrock Nova web grounding</td>
+<td>4.2</td>
+<td>4.5</td>
+<td>3.0</td>
+<td>4.2</td>
+</tr>
+<tr>
+<td>LiteLLM 如何配置 Bedrock Claude 模型</td>
+<td>4.2</td>
+<td>3.8</td>
+<td>4.2</td>
+<td>2.8</td>
+</tr>
+<tr>
+<td>EKS 节点自动扩缩容 Karpenter 原理</td>
+<td>4.8</td>
+<td>3.8</td>
+<td>2.5</td>
+<td>3.5</td>
+</tr>
+</tbody>
+</table>
+<p>观察：</p>
+<ul>
+<li>没有后端在所有 query 上全胜。agentcore 在偏 AWS 生态的 query（Claude
+模型 5.0、IRSA 4.8）表现强，但在通用技术（Q6）和部分中文
+query（Q9）偏弱。</li>
+<li>时效类（Q1–Q3 带 2026/latest）区分度最大，exa
+稳定命中最新内容。</li>
+<li>"2026 AWS
+re:Inforce"（Q2）全员偏低——该会议信息可能确实稀少，非后端缺陷。</li>
+</ul>
+<hr />
+<h2 id="4-综合画像">4. 综合画像</h2>
+<table>
+<thead>
+<tr>
+<th>后端</th>
+<th>延迟 p50</th>
+<th>效果总分</th>
+<th>综合定位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>exa_ai</strong></td>
+<td>232ms</td>
+<td>4.42</td>
+<td>又快又好（本测试综合最优）</td>
+</tr>
+<tr>
+<td><strong>tavily</strong></td>
+<td>231ms</td>
+<td>3.70</td>
+<td>快、效果中上</td>
+</tr>
+<tr>
+<td><strong>agentcore</strong></td>
+<td>1680ms</td>
+<td>3.67</td>
+<td>跨区慢、来源权威但相关性一般</td>
+</tr>
+<tr>
+<td><strong>searxng</strong></td>
+<td>560ms</td>
+<td>2.65</td>
+<td>中速、效果最弱（噪声大）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-局限与解读重要">5. 局限与解读（重要）</h2>
+<p>本测试的数据需在以下限定条件下理解，不可直接外推：</p>
+<ol type="1">
+<li><strong>发起位置绑定新加坡</strong>：AgentCore 仅
+us-east-1，从新加坡测天然跨区。这是 AgentCore 延迟
+垫底的主因——<strong>换 us-east-1 部署
+LiteLLM，结论会显著不同</strong>（见 §2.1）。</li>
+<li><strong>连接未复用</strong>：benchmark 每次新建 HTTPS
+连接，AgentCore 每次多付 ~450ms TLS 握手。生产 中 LiteLLM
+用持久连接会更快，本测试<strong>高估</strong>了 AgentCore 延迟。</li>
+<li><strong>样本量小</strong>：每后端 30 次，p95/p99 仅供参考，主看
+p50/mean。</li>
+<li><strong>judge 偏差</strong>：用 GPT-5.5
+单模型盲评，已隐藏后端名+打乱顺序去偏，但单一 judge 仍有其
+口味偏好；评分是相对参考，非绝对真值。</li>
+<li><strong>searxng 地理污染</strong>：SearXNG 聚合上游引擎，结果受 Pod
+出口地理影响（混入新加坡本地新闻），
+这是其低分的部分原因，换出口/调引擎配置可能改善。</li>
+<li><strong>效果维度未覆盖"对最终答案的影响"</strong>：本测试只评搜索结果质量，未测注入结果后模型最终回答
+的准确性差异。</li>
+</ol>
+<hr />
+<h2 id="6-结论与选型建议">6. 结论与选型建议</h2>
+<ul>
+<li><strong>纯延迟/效果论</strong>：exa 综合最优，tavily
+次之。若团队只追求搜索质量与速度、且能接受引入第三方 API Key
+与境外依赖，exa/tavily 是更强的选择。</li>
+<li><strong>AgentCore
+的价值不在性能排名</strong>，而在工程与治理维度（见对比表）：
+<ul>
+<li>全托管，免维护搜索引擎（对比 searxng 要自己跑容器/维护）；</li>
+<li>搜索流量不出 AWS 网络；</li>
+<li>复用 IAM/IRSA 鉴权，无需第三方 API Key 与账号；</li>
+<li>计费并入 AWS 账单。</li>
+</ul></li>
+<li><strong>适用判断</strong>：已重度使用
+AWS/Bedrock、看重数据不出网与凭证统一治理的团队，AgentCore 的省心
+与合规优势可抵消其延迟/效果上的非领先。若把 LiteLLM 部署到 us-east-1
+并复用连接，其延迟劣势 还会大幅缩小。</li>
+<li><strong>searxng</strong>：本测试中效果最弱、噪声最大，除非有自建可控/数据完全私有的硬性诉求，性价比不高。</li>
+</ul>
+<hr />
+<blockquote>
+<p>附：原始数据见同目录
+<code>bench.latency.csv</code>（延迟）、<code>*.results.jsonl</code>（搜索结果原文）、
+<code>eval.scores.csv</code>（逐 query
+逐维度评分）、<code>eval.judge.jsonl</code>（盲评映射与 judge
+理由原文）。
+测试脚本：<code>bench_search.py</code>（延迟）、<code>judge_search.py</code>（LLM-judge）。</p>
+</blockquote>
+<footer class="post">
+  本文为技术实战记录，命令均经真实环境验证；文中账号/资源标识符已替换为占位符。样式参考 AWS 博客版式，非官方出品。
+</footer>
+</div>
+<script>
+// 把以 ℹ️ / ⚠️ / ✅ 开头的段落渲染成 callout 盒子
+document.querySelectorAll('.wrap > p, .wrap p').forEach(function(p){
+  var t = p.textContent.trim();
+  if(t.startsWith('ℹ️')) p.className='callout note';
+  else if(t.startsWith('⚠️')) p.className='callout warn';
+  else if(t.startsWith('✅')) p.className='callout ok';
+});
+// 图注：把 [图N：...] 的段落变成居中小字
+document.querySelectorAll('.wrap p').forEach(function(p){
+  if(/^\[图\d+/.test(p.textContent.trim())) p.className='imgcap';
+});
+</script>
+</body>
+</html>

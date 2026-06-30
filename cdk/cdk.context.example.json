@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to cdk.context.json (gitignored) and fill real values, OR pass via -c at synth/deploy.",
+  "domain": "your-domain.example.com",
+  "hostedZoneId": "ZXXXXXXXXXXXXX",
+  "clusterAdminPrincipals": ["arn:aws:iam::<ACCOUNT_ID>:role/<your-admin-role>"]
+}

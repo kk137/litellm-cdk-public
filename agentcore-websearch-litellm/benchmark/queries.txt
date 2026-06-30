@@ -1,0 +1,21 @@
+# 搜索后端对比 query 集（# 开头为注释，空行忽略）
+# 覆盖：时效类 / 事实类 / 技术类 / 中文 / 长尾
+# 你可自由增删，建议保持 8-15 条，太多人工评估吃力
+
+# --- 时效类（考验能否命中最新信息）---
+latest AWS Bedrock announcements June 2026
+2026 年 AWS re:Inforce 大会有哪些新发布
+newest Claude model released 2026
+
+# --- 事实类（答案相对稳定，考验准确性）---
+what is Amazon Bedrock AgentCore
+how does AWS IRSA work for EKS pods
+
+# --- 技术长尾类（考验冷门话题召回）---
+LiteLLM websearch interception non-streaming behavior
+mcp-proxy-for-aws sigv4 authentication
+Amazon Bedrock Nova web grounding nova_grounding systemTool
+
+# --- 中文类（考验中文检索质量）---
+LiteLLM 如何配置 Bedrock Claude 模型
+EKS 节点自动扩缩容 Karpenter 原理

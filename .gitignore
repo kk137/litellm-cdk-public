@@ -1,0 +1,17 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+cdk.out
+cdk.context.json
+cdk.context.*.json
+!cdk.context.example.json
+*.log
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Real-value mapping for sanitized docs — NEVER commit
+docs/.values.REAL.md
+docs/*.REAL.md
