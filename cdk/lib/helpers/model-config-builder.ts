@@ -54,6 +54,14 @@ const BEDROCK_MODELS: BedrockModel[] = [
     modelInfo: { max_input_tokens: 1000000, max_output_tokens: 128000 },
   },
   {
+    // Launch pricing $2/$10 per M tokens through 2026-08-31, then standard $3/$15 (anthropic.com/claude/sonnet).
+    name: 'claude-sonnet-5',
+    bedrockId: 'anthropic.claude-sonnet-5',
+    prefixPreference: ['us', 'global'],
+    extraParams: { stream_timeout: 900, input_cost_per_token: 0.000002, output_cost_per_token: 0.00001 },
+    modelInfo: { max_input_tokens: 1000000, max_output_tokens: 128000 },
+  },
+  {
     name: 'claude-sonnet-4-6',
     bedrockId: 'anthropic.claude-sonnet-4-6',
     prefixPreference: ['us', 'global'],

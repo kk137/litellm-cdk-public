@@ -1092,6 +1092,7 @@ function addLitellmManifests(scope: Construct, cluster: eks.Cluster, props: Mani
       path.join(
         __dirname,
         '..',
+        '..',
         'agentcore-websearch-litellm',
         'src',
         'agentcore_websearch.py',
@@ -1108,6 +1109,7 @@ function addLitellmManifests(scope: Construct, cluster: eks.Cluster, props: Mani
     configData['bedrock_team_tag_hook.py'] = fs.readFileSync(
       path.join(
         __dirname,
+        '..',
         '..',
         'bedrock-cost-attribution',
         'src',
