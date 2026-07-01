@@ -25,7 +25,7 @@ diff: init
 
 deploy:
 	@test -n "$(DOMAIN)" || (echo "Error: DOMAIN is required. Example: make deploy DOMAIN=example.com REGION=ap-southeast-1"; exit 1)
-	bash scripts/deploy.sh --domain $(DOMAIN) $(if $(REGION),--region $(REGION)) $(if $(filter-out litellm,$(HOST_PREFIX)),--host-prefix $(HOST_PREFIX))
+	bash scripts/deploy.sh deploy-all --domain $(DOMAIN) $(if $(REGION),--region $(REGION)) $(if $(filter-out litellm,$(HOST_PREFIX)),--host-prefix $(HOST_PREFIX))
 
 destroy:
 	npx cdk destroy --all

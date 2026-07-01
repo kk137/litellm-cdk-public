@@ -19,7 +19,7 @@ This reproduction follows a few deliberate principles — adjust per environment
 
 1. **Parameter-driven, zero hardcoded values.** Account/region come from the AWS
    environment; domain/zone/AZs/RDS-version/Bedrock-profiles are auto-discovered by
-   `init-env.ts`. Source has no real values (grep-verified in CI of every push).
+   `init-env.ts`. Source has no real values (grep-verified before each push).
 2. **Least privilege.** Bedrock IRSA is scoped to `foundation-model/*` +
    `inference-profile/*` (not `*`); RDS/Redis SGs are `allowAllOutbound: false`.
 3. **Secrets never on disk.** Credentials live in AWS Secrets Manager and reach pods
@@ -176,8 +176,8 @@ only `--domain` is required. Full walkthrough + post-deploy steps + troubleshoot
 
 ```bash
 cd cdk   # all CDK code lives under cdk/
-./scripts/deploy.sh --domain your.domain.com --region ap-southeast-1 --host-prefix litellm-sin
-# or: make init/synth/deploy  (DOMAIN=... REGION=... HOST_PREFIX=... [MAX_AZS=2])
+./scripts/deploy.sh deploy-all --domain your.domain.com --region ap-southeast-1 --host-prefix litellm-sin
+# or: make init DOMAIN=... REGION=... HOST_PREFIX=... [MAX_AZS=2]   (then synth/deploy)
 ```
 
 ## Build / synth / dry-run
