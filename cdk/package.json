@@ -10,8 +10,8 @@
     "watch": "tsc -w",
     "init": "ts-node scripts/init-env.ts",
     "synth": "cdk synth",
-    "deploy": "cdk deploy --all",
-    "destroy": "cdk destroy --all"
+    "deploy": "bash scripts/deploy.sh deploy-all",
+    "destroy": "bash scripts/deploy.sh destroy"
   },
   "devDependencies": {
     "@aws-sdk/client-bedrock": "^3.1072.0",

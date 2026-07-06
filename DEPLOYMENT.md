@@ -30,6 +30,8 @@
 
 模型默认走 **Bedrock Claude / Nova(经 IRSA,无需任何 AKSK/key)**。GPT-5.x、Gemini 是可选,见 [可选特性](#可选特性如需才看)。
 
+> 💰 **部署前先估个价**:整套基础设施的月成本明细(EKS/RDS/Redis/节点/NAT/ALB 等,Price List 实价)见 [`docs/cost-analysis/README.md`](docs/cost-analysis/README.md)。模型调用费按 token 另算。
+
 ---
 
 ## ① 部署前准备

@@ -67,9 +67,7 @@ This reproduction follows a few deliberate principles — adjust per environment
 | 路径 | 是什么 |
 |---|---|
 | `DEPLOYMENT.md` | 部署总入口(前置 / 部署 / 后置三段) |
-| `bin/` · `lib/` | CDK 应用入口 + 三个栈(network / data / cluster)与 helpers/policies |
-| `scripts/` | `deploy.sh`(一键部署)、`init-env.ts`(参数自动发现) |
-| `cdk.json` · `package.json` · `tsconfig.json` · `cdk.context*.json` | CDK / Node / TS 配置与参数 |
+| `cdk/` | **全部 CDK 代码**:`bin/`(应用入口)、`lib/`(三个栈 + helpers/policies)、`scripts/`(`deploy.sh` 一键部署、`init-env.ts` 参数自动发现)、`cdk.json` / `package.json` / `tsconfig.json` 等配置。**部署命令都在这个目录里跑** |
 | `docs/` | 编号文档,见下表(文件名即阅读顺序) |
 | `agentcore-websearch-litellm/` | **可选附属服务**:AgentCore Web Search × LiteLLM 集成(独立 Python 子项目,自带 docs) |
 | `bedrock-cost-attribution/` | **可选附属服务**:per-team Bedrock 成本归因 hook(Python) |
@@ -84,6 +82,7 @@ This reproduction follows a few deliberate principles — adjust per environment
 | [`10-optional-gpt-mantle.md`](docs/10-optional-gpt-mantle.md) | GPT-5.x via Bedrock Mantle:API key 生成 + 接入 |
 | [`11-optional-agentcore-websearch.md`](docs/11-optional-agentcore-websearch.md) | AgentCore Web Search 部署 + 客户端接入 runbook |
 | [`12-monitoring-logging.md`](docs/12-monitoring-logging.md) | SpendLogs / Prometheus / CloudWatch / S3 + 成本归因 |
+| [`cost-analysis/README.md`](docs/cost-analysis/README.md) | **部署前先看**:整套基础设施月成本明细(Price List 实价,不含模型调用费) |
 
 ---
 
@@ -198,29 +197,13 @@ CDK_DEFAULT_ACCOUNT=<acct> CDK_DEFAULT_REGION=<region> \
   npx cdk synth -c domain=<domain> -c hostedZoneId=<zoneId> -c clusterAdminPrincipals='["arn:..."]'
 ```
 
-## Must-do before / at deploy (otherwise pods CrashLoop)
+## 部署前后必做的事(唯一出处在 DEPLOYMENT.md)
 
-These are NOT optional — skipping them leaves the cluster unhealthy:
+操作步骤**只维护在 [`DEPLOYMENT.md`](DEPLOYMENT.md) 一处**(前置清单 → 一键部署 → 部署后收尾),本 README 不重复,以免多处副本失同步。仅提示其中唯一"漏了不报错、pod 静默起不来"的一项:
 
-1. **searxng `settings.yml`** — the committed ConfigMap is a `# placeholder` only.
-   searxng will CrashLoop without a valid `settings.yml` (needs at least
-   `server.secret_key`), which then breaks litellm's web-search interception
-   (`SEARXNG_API_BASE`). Inject a real `settings.yml` at deploy time (e.g.
-   `kubectl create configmap searxng-config --from-file=settings.yml=... --dry-run=client -o yaml | kubectl apply -f -`)
-   before the searxng pod stabilizes.
-2. **Fill the `CHANGE_ME` secrets** — `aws secretsmanager update-secret --secret-id <region>-litellm/config`:
-   `GENERIC_CLIENT_ID`/`GENERIC_CLIENT_SECRET` (from the `litellm-ui` Cognito client, see step 1 below),
-   `LITELLM_SALT_KEY`, `BEDROCK_MANTLE_API_KEY`, `GEMINI_API_KEY`, `UI_PASSWORD`.
-   `LITELLM_MASTER_KEY` is auto-generated. **`REDIS_PASSWORD` is wired automatically**
-   to the ElastiCache AUTH token (the `<region>-litellm/redis-auth` secret) — do NOT set it by hand.
+> ⚠️ **SALT secret 必须在首次 deploy 前手建**,且是**独立 secret** `<region>-litellm/salt`(**不是** config secret 里的字段)。一旦设定永不能改。详见 [`DEPLOYMENT.md` §B5](DEPLOYMENT.md) 与 [`docs/03-gotchas.md` #8](docs/03-gotchas.md)。
 
-## Post-deploy manual steps (cannot be done at synth)
-
-1. **Cognito → secret** — push the `litellm-ui` Cognito client id/secret into the config secret
-   (`GENERIC_CLIENT_ID`/`GENERIC_CLIENT_SECRET`); see the `PostDeploySecretReminder` stack output.
-2. **Route53 A-alias** — `litellm.<domain>` → ALB DNS. The ALB is created by the in-cluster ALB
-   controller *after* pods run, so its DNS isn't known at synth; create the alias manually or via external-dns.
-3. **Sub-domain delegation** — if `<domain>` is a delegated sub-zone, ensure the parent zone's NS records point here.
+其余(Cognito 回填、Route53 alias、admin 用户、rollout 验证)由 `./scripts/deploy.sh post` 幂等自动完成;searxng 的 `settings.yml` 已完整内置于 CDK,无需手工注入。
 
 ## Config / auth model (aligned to prod)
 
@@ -261,7 +244,6 @@ These mirror the live prod setup intentionally — change them per environment i
 
 ## Known gaps vs a live prod env
 
-- `searxng` `settings.yml` is a placeholder ConfigMap — inject real settings at deploy time (see must-do step 1).
 - Builds a **new** stack from zero — does **not** adopt an existing cluster.
 
 ## Contributing
