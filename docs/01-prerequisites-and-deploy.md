@@ -190,20 +190,26 @@ aws cognito-idp describe-user-pool-client --user-pool-id <POOL_ID> \
 ```
 (POOL_ID / CLIENT_ID 见 ClusterStack 的 `UserPoolId` / `UserPoolClientId` 输出)
 
-### 3.3 SearXNG settings.yml(**已根治,通常无需操作**)
+### 3.3 SearXNG settings.yml(**开箱即用,通常无需操作**)
 
-> CDK 现在已把完整可启动的 `settings.yml`(含非空 `secret_key` + 引擎列表)写进 ConfigMap,Deployment 也挂好了——全新部署 searxng 直接 Running。下面的"从已有环境复制"只在你想换引擎配置、或 searxng 异常时才需要。
+> `settings.yml` 的**源**是 `cdk/lib/cluster-stack.ts` 里的 `searxngSettingsYaml` 常量(含非空 `secret_key` + 引擎列表),synth 时生成 ConfigMap、Deployment 挂载好——全新部署 searxng 直接 Running。仓库里**没有**独立的 settings.yml 文件,改配置就是改这段 TS。
 
-(早期版本 CDK 只放一行 placeholder 注释,导致 searxng `Invalid settings.yml` 反复 CrashLoop;现已修复。)从已有环境复制配置(仅在需要自定义时):
+想自定义(换搜索引擎、调 safe_search 等),按 IaC 正道走:
 
 ```bash
-# 从已有集群导出
-kubectl get configmap searxng-config -n litellm --context <SOURCE_CLUSTER> \
-  -o jsonpath='{.data.settings\.yml}' > /tmp/searxng-settings.yml
+# 1. 编辑 cdk/lib/cluster-stack.ts 中的 searxngSettingsYaml(搜这个常量名)
+# 2. 重新部署 Cluster 栈(只会更新 ConfigMap)。⚠️ 钉死 region(见 gotcha #1)
+AWS_REGION=<REGION> AWS_DEFAULT_REGION=<REGION> \
+CDK_DEFAULT_REGION=<REGION> CDK_DEFAULT_ACCOUNT=<ACCOUNT_ID> \
+npx cdk deploy litellm-Cluster
+# 3. searxng 不会自动重载,重启使其生效
+kubectl rollout restart deployment/searxng -n litellm
+```
 
-# 应用到新集群并重启
-kubectl create configmap searxng-config -n litellm \
-  --from-file=settings.yml=/tmp/searxng-settings.yml --dry-run=client -o yaml | kubectl apply -f -
+临时试验(改动会在下次 `cdk deploy` 时被 TS 源覆盖,验证好了记得写回 cluster-stack.ts):
+
+```bash
+kubectl edit configmap searxng-config -n litellm
 kubectl rollout restart deployment/searxng -n litellm
 ```
 
