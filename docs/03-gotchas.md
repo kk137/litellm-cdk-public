@@ -56,7 +56,7 @@ LiteLLM 侧看不到搜索执行(`_execute_search` 用 verbose_logger.debug,而 
 
 ## 8. SALT secret 必须 deploy 前手建,否则 pod 静默起不来
 
-`LITELLM_SALT_KEY` 加密 DB 里的虚拟 key,一旦设定永不能改。因此 CDK **故意不创建**它(`data-stack.ts:249` 用 `fromSecretNameV2` 只引用,避免 CFN 替换 brick 掉 DB key),`deploy.sh`/`init-env` 也不自动建。
+`LITELLM_SALT_KEY` 加密 DB 里的虚拟 key,一旦设定永不能改。因此 CDK **故意不创建**它(`data-stack.ts` 用 `fromSecretNameV2` 只引用,避免 CFN 替换 brick 掉 DB key),`deploy.sh`/`init-env` 也不自动建。
 
 - **必须在首次 `cdk deploy` 之前**手动创建一个**独立 secret** `<region>-litellm/salt`,JSON 键名 `LITELLM_SALT_KEY`:
   ```bash

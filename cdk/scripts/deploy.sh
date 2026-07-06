@@ -25,6 +25,7 @@ set -euo pipefail
 #   --domain <domain>      Route53 域名(必填,除非 --skip-init)
 #   --region <region>      默认 ap-southeast-1(硬钉,防 us-east-1 环境污染)
 #   --host-prefix <prefix> 默认 litellm
+#   --max-azs <n>          NodePool/网络用几个 AZ(默认 2;生产 HA 可 3)
 #   --skip-init            跳过 init-env,复用已有 cdk.context.json
 #============================================================
 
@@ -38,6 +39,7 @@ DOMAIN=""
 REGION="${DEFAULT_REGION}"
 HOST_PREFIX="litellm"
 ADMIN_PRINCIPALS=""
+MAX_AZS=""
 SKIP_INIT=""
 PROJECT_NAME="litellm"
 
@@ -57,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --region) REGION="$2"; shift 2;;
     --host-prefix) HOST_PREFIX="$2"; shift 2;;
     --admin-principals) ADMIN_PRINCIPALS="$2"; shift 2;;
+    --max-azs) MAX_AZS="$2"; shift 2;;
     --skip-init) SKIP_INIT=1; shift;;
     -h|--help) CMD="help"; break;;
     *) log_error "Unknown option: $1"; exit 1;;
@@ -85,6 +88,7 @@ do_init() {
         local INIT_ARGS="--domain $DOMAIN --region $REGION"
         [[ "$HOST_PREFIX" != "litellm" ]] && INIT_ARGS="$INIT_ARGS --host-prefix $HOST_PREFIX"
         [[ -n "$ADMIN_PRINCIPALS" ]] && INIT_ARGS="$INIT_ARGS --admin-principals '$ADMIN_PRINCIPALS'"
+        [[ -n "$MAX_AZS" ]] && INIT_ARGS="$INIT_ARGS --max-azs $MAX_AZS"
         eval npx ts-node scripts/init-env.ts $INIT_ARGS
         cp cdk.context.local.json cdk.context.json
         log_info "cdk.context.json updated."
@@ -393,6 +397,7 @@ Options:
   --domain <domain>       Route53 域名(init 必填)
   --region <region>       AWS 区域(默认 ${DEFAULT_REGION})
   --host-prefix <prefix>  子域名前缀(默认 litellm)
+  --max-azs <n>           NodePool/网络 AZ 数(默认 2,生产 HA 可 3)
   --admin-principals <json>  IAM ARN 列表(kubectl 访问)
   --skip-init             init 子命令专用:跳过发现,复用已有 cdk.context.json
 

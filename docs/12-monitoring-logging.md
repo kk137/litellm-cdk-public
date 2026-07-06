@@ -8,7 +8,7 @@
 
 | 维度 | 内容 | 存储位置 | 保留期 |
 |------|------|----------|--------|
-| **① 用户/Key 用量** | 每次请求的 model、token、花费、归属 key/user/team | RDS Aurora PostgreSQL（`LiteLLM_SpendLogs` 等表） | 永久（除非手动清理） |
+| **① 用户/Key 用量** | 每次请求的 model、token、花费、归属 key/user/team | RDS PostgreSQL（`LiteLLM_SpendLogs` 等表） | 永久（除非手动清理） |
 | **② 集群/应用运行** | LiteLLM 进程日志、Pod 状态、实时指标 | Pod stdout（`kubectl logs`）+ Prometheus `/metrics` | 临时（Pod 重启即丢） |
 | **③ 审计** | 谁在何时调用了 K8s API / 谁改了集群 | CloudWatch `/aws/eks/litellm-cluster/cluster`（audit 类型） | 30 天 |
 
@@ -20,7 +20,7 @@
 
 ### 1.1 存什么、存哪里
 
-LiteLLM 把**每一次请求**写入 RDS Aurora PostgreSQL（`<YOUR_RDS_ENDPOINT>`），核心表：
+LiteLLM 把**每一次请求**写入 RDS PostgreSQL（`<YOUR_RDS_ENDPOINT>`），核心表：
 
 | 表名 | 内容 |
 |------|------|
@@ -40,7 +40,7 @@ LiteLLM 把**每一次请求**写入 RDS Aurora PostgreSQL（`<YOUR_RDS_ENDPOINT
 | 账目元数据 | `litellm_metadata` | key/team/spend/token/IP/user-agent 等 |
 
 > ⚠️ **关键：DB 里的正文被截断到 2048 字符/段**
-> - 由 LiteLLM 应用层常量 **`MAX_STRING_LENGTH_PROMPT_IN_DB`（默认 `2048`）** 控制，**不是 Aurora 的限制**（Aurora 单字段可达 ~1GB）。当前 pod **未设此环境变量 → 用默认 2048**。
+> - 由 LiteLLM 应用层常量 **`MAX_STRING_LENGTH_PROMPT_IN_DB`（默认 `2048`）** 控制，**不是数据库的限制**（PostgreSQL 单字段可达 ~1GB）。当前 pod **未设此环境变量 → 用默认 2048**。
 > - 超长正文写 DB 前被砍：**保留开头 35% + 结尾 65%**（结尾对排查更重要），中间插入 `litellm_truncated` 提示。
 > - 所以 **UI / DB 里看到的长对话是残缺的**。要**完整正文**，官方明示需走 logging callback（OTEL/Datadog/**S3**）—— 见改进项 #2。
 > - 调大阈值（如 `MAX_STRING_LENGTH_PROMPT_IN_DB=50000`）可让 DB 存更全，但在高 token 量级下会显著推高 RDS 存储 / Serverless ACU，**不推荐**。
@@ -123,7 +123,6 @@ kubectl logs -n litellm -l app=litellm --tail=500 --since=10m \
 kubectl logs -n litellm -l app=litellm --tail=200 --since=5m | grep -E "POST|GET" \
   | grep -v "health\|spend\|key/list"
 ```
-（更多查询模板见 `CLAUDE.md` 的 Log Queries 段。）
 
 > **如果需要持久化应用日志**：可选方案是装 **CloudWatch Container Insights**（`amazon-cloudwatch` namespace 的 cloudwatch-agent + fluent-bit），日志进 `/aws/containerinsights/litellm-cluster/application`。当前**未安装**（实测 `amazon-cloudwatch` ns 为空、无该 log group）。要不要重新引入需权衡成本 —— 之前的 LogHub 方案正因 NAT/OpenSearch 烧钱而被拆除。
 
@@ -224,7 +223,7 @@ aws logs filter-log-events --region us-east-1 \
 
 **解决什么问题**：两个缺口。① 应用日志只在 Pod stdout、重启即丢（见维度 ②）；② **RDS SpendLogs 里的正文被截断到 2048 字符**（见 1.2）。`s3_v2` 把**完整、未截断**的记录永久落 S3 —— 实测下载验证 S3 对象 `litellm_truncated=false`，正文/响应完整。这正是 1.2 截断提示里官方建议的方案（"Full, untruncated data is logged to logging callbacks"）。
 
-**当前实际配置**（已写入 `04-configmap.yaml` 的 `litellm_settings`，实测生效）：
+**当前实际配置**（由 `cdk/lib/helpers/model-config-builder.ts` 在 synth 时生成进 litellm-config ConfigMap，实测生效）：
 
 ```yaml
 litellm_settings:

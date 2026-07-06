@@ -1,4 +1,4 @@
-# 新加坡 EKS 部署后操作 — Step by Step
+# EKS 部署后操作 — Step by Step
 
 > 📍 **新手从 [`../DEPLOYMENT.md`](../DEPLOYMENT.md) 开始**(部署总入口)。本文是其中「③ 部署后步骤」的**逐条手工版**,供 `deploy.sh post` 某步失败时照着补。
 
@@ -24,32 +24,31 @@
 
 部署完成后如果要手工逐步操作(或 post 某步失败需要补),按下面步骤来。
 
-> 假设你已经在 `~/litellm-cdk` 目录,kubeconfig 已切到新加坡集群:
+> 假设你已在仓库的 `cdk/` 目录,kubeconfig 已切到目标集群:
 > ```bash
-> aws eks update-kubeconfig --name litellm-cluster --region ap-southeast-1
+> aws eks update-kubeconfig --name litellm-cluster --region <REGION>
 > ```
 
 ---
 
-## 部署上下文(实际值速查)
+## 部署上下文(先取你自己的值)
 
-下面的命令使用以下真实值,如果集群重建过这些值会变,先跑一遍 `./scripts/deploy.sh outputs` 拿最新的:
+下面的命令用到这些环境值——**先跑一遍 `./scripts/deploy.sh outputs`(和 `kubectl get ingress -n litellm`)拿你自己环境的真实值**,对照替换:
 
-| 字段 | 值 |
+| 字段 | 从哪拿 |
 |---|---|
-| 域名 / 子域名 | `litellm-sg.<your-domain>` |
-| Route53 HostedZone Id | `<HOSTED_ZONE_ID>` |
-| ALB DNS | `k8s-litellm-litellm-ddd5456bd8-1896667943.ap-southeast-1.elb.amazonaws.com` |
-| ALB Canonical HostedZone Id | `Z1LMS91P8CMLE5` |
-| Cognito UserPoolId | `<USER_POOL_ID>` |
-| Cognito ClientId | `<COGNITO_CLIENT_ID>` |
-| LitellmConfig Secret | `ap-southeast-1-litellm/config` |
+| 域名 / 子域名 `<host-prefix>.<your-domain>` | 你部署时传的 `--host-prefix` + `--domain` |
+| Route53 HostedZone Id | `deploy.sh outputs`(或 `cdk.context.json` 的 `hostedZoneId`) |
+| ALB DNS | `kubectl get ingress -n litellm litellm -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'` |
+| ALB Canonical HostedZone Id | `aws elbv2 describe-load-balancers` 按上面 DNS 过滤(每个 region 是固定公共常量) |
+| Cognito UserPoolId / ClientId | Cluster 栈 outputs `UserPoolId` / `UserPoolClientId` |
+| LitellmConfig Secret | `<REGION>-litellm/config` |
 
 ---
 
 ## ① Route53 创建 A-alias 记录
 
-把 `litellm-sg.<your-domain>` 指向 ALB。
+把 `<host-prefix>.<your-domain>` 指向 ALB。
 
 ```bash
 ALB_DNS=$(kubectl get ingress -n litellm litellm \
@@ -61,11 +60,11 @@ ALB_HZ=$(aws elbv2 describe-load-balancers --region ap-southeast-1 \
 
 cat > /tmp/r53-alias.json <<EOF
 {
-  "Comment": "litellm-sg → ALB",
+  "Comment": "litellm → ALB",
   "Changes": [{
     "Action": "UPSERT",
     "ResourceRecordSet": {
-      "Name": "litellm-sg.<your-domain>",
+      "Name": "<host-prefix>.<your-domain>",
       "Type": "A",
       "AliasTarget": {
         "HostedZoneId": "${ALB_HZ}",
@@ -84,10 +83,10 @@ aws route53 change-resource-record-sets \
 
 **验证**(等 ~30 秒 DNS 生效):
 ```bash
-dig +short litellm-sg.<your-domain>
+dig +short <host-prefix>.<your-domain>
 # 应返回 ALB 的 IP(几个 IP 轮询)
 
-curl -sk -o /dev/null -w "%{http_code}\n" https://litellm-sg.<your-domain>/health/liveliness
+curl -sk -o /dev/null -w "%{http_code}\n" https://<host-prefix>.<your-domain>/health/liveliness
 # 应返回 200(LiteLLM 健康检查)
 ```
 
@@ -249,7 +248,7 @@ kubectl exec -n litellm deploy/litellm -- printenv GENERIC_CLIENT_ID
 
 > **从 cluster-stack.ts 这次更新开始,CDK 已经把完整可启动的 settings.yml 写进 `searxng-config` ConfigMap**(包含非空 `secret_key` + 引擎列表),Deployment 也挂载到 `/etc/searxng/`。**第一次 `cdk deploy` 完成时 searxng 就应该是 Running**——这一步是**确认**用的,不是手工配置。
 >
-> 历史记录:这个文档早期版本要求"从美东 import + patch volumeMount + 注入 settings",那是因为旧版 CDK 只放了一行 placeholder 注释,导致 searxng 因 `Invalid settings.yml` 反复 CrashLoop。现在已修复,不需要那些步骤。
+> 历史记录:这个文档早期版本要求"从旧集群 import + patch volumeMount + 注入 settings",那是因为旧版 CDK 只放了一行 placeholder 注释,导致 searxng 因 `Invalid settings.yml` 反复 CrashLoop。现在已修复,不需要那些步骤。
 
 ### 3.1 现状检查(必跑,2 分钟内出结论)
 
@@ -277,20 +276,14 @@ print('status:', r.status, 'results:', len(d.get('results', [])))
 
 > **三项全过 → SearXNG 完全 OK,直接跳到 Step ④。**
 
-### 3.2 ConfigMap 不存在时的修复(从美东导一份)
+### 3.2 ConfigMap 不存在时的修复(重新 deploy Cluster 栈)
 
-只在 3.1 A 报 `not found` 时跑。前提:本地 kubectl 配置里有美东 context。
+只在 3.1 A 报 `not found` 时跑。ConfigMap 的源是 `cdk/lib/cluster-stack.ts` 里的 `searxngSettingsYaml` 常量,重新 deploy 即可重建(⚠️ 同一条命令钉死 region,见 gotcha #1):
 
 ```bash
-# 拉美东 ConfigMap,清理掉绑定到原集群的 metadata
-kubectl --context arn:aws:eks:us-east-1:<ACCOUNT_ID>:cluster/litellm-cluster \
-  get cm searxng-config -n litellm -o yaml \
-  | grep -v -E "uid:|resourceVersion:|creationTimestamp:|namespace: litellm" \
-  > /tmp/searxng-config.yaml
-
-# apply 到新加坡(显式 --context 防 kubectl 切错集群)
-kubectl --context arn:aws:eks:ap-southeast-1:<ACCOUNT_ID>:cluster/litellm-cluster \
-  apply -n litellm -f /tmp/searxng-config.yaml
+AWS_REGION=<REGION> AWS_DEFAULT_REGION=<REGION> \
+CDK_DEFAULT_REGION=<REGION> CDK_DEFAULT_ACCOUNT=<ACCOUNT_ID> \
+npx cdk deploy litellm-Cluster
 
 # 重启 searxng 加载
 kubectl rollout restart deployment/searxng -n litellm
@@ -405,7 +398,7 @@ echo "首次登录会强制改密"
 
 ### 4.2 首次登录改密码
 
-打开 https://litellm-sg.<your-domain>/ui/(部署完 R53 alias 生效后能访问)→ 跳到 Cognito Hosted UI → 输入用户名 + 临时密码 → 系统强制改新密码 → 重定向回 LiteLLM UI。
+打开 https://<host-prefix>.<your-domain>/ui/(部署完 R53 alias 生效后能访问)→ 跳到 Cognito Hosted UI → 输入用户名 + 临时密码 → 系统强制改新密码 → 重定向回 LiteLLM UI。
 
 ---
 
@@ -413,10 +406,10 @@ echo "首次登录会强制改密"
 
 ```bash
 # 1. DNS 解析
-dig +short litellm-sg.<your-domain>
+dig +short <host-prefix>.<your-domain>
 
 # 2. 健康检查
-curl -sk -o /dev/null -w "%{http_code}\n" https://litellm-sg.<your-domain>/health/liveliness
+curl -sk -o /dev/null -w "%{http_code}\n" https://<host-prefix>.<your-domain>/health/liveliness
 # 期望 200
 
 # 3. pods 全 Ready
@@ -429,7 +422,7 @@ MASTER_KEY=$(aws secretsmanager get-secret-value \
   --secret-id ap-southeast-1-litellm/config \
   --query SecretString --output text | jq -r '.LITELLM_MASTER_KEY')
 
-curl -s https://litellm-sg.<your-domain>/v1/messages \
+curl -s https://<host-prefix>.<your-domain>/v1/messages \
   -H "x-api-key: $MASTER_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
@@ -441,7 +434,7 @@ curl -s https://litellm-sg.<your-domain>/v1/messages \
 # 期望返回 JSON 含 content + usage
 
 # 5. UI 登录(浏览器)
-# https://litellm-sg.<your-domain>/ui/
+# https://<host-prefix>.<your-domain>/ui/
 # Cognito SSO → 用 4.1 创建的账号登录
 ```
 
@@ -454,7 +447,7 @@ curl -s https://litellm-sg.<your-domain>/v1/messages \
 - 通常是 litellm pod 还没 Ready 或 SG 没放通,等 pod 起来即可
 
 **Q2. UI 登录跳到 Cognito 报 redirect_uri mismatch**
-- Cognito UserPoolClient 的 callback URL 列表要包含 `https://litellm-sg.<your-domain>/sso/callback`
+- Cognito UserPoolClient 的 callback URL 列表要包含 `https://<host-prefix>.<your-domain>/sso/callback`
 - 检查:`aws cognito-idp describe-user-pool-client --region ap-southeast-1 --user-pool-id <USER_POOL_ID> --client-id <COGNITO_CLIENT_ID> --query 'UserPoolClient.CallbackURLs'`
 - CDK 应该已经配好,如果不对手动 update-user-pool-client
 

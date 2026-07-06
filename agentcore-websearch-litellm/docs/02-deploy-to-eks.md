@@ -5,11 +5,18 @@
 ## 前置：IAM 权限（已完成）
 
 LiteLLM pod 走 IRSA（serviceaccount `litellm-sa` → role
-`litellm-Cluster-ClusterLitellmSaRoleB6A0F44D-K4BkyERtnoUn`）。已加最小权限 inline policy：
+`<LITELLM_SA_ROLE_NAME>`）。role 名是 CFN 生成的,先查你自己环境的:
+
+```bash
+kubectl get sa litellm-sa -n litellm \
+  -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
+```
+
+已加最小权限 inline policy：
 
 ```bash
 aws iam put-role-policy \
-  --role-name litellm-Cluster-ClusterLitellmSaRoleB6A0F44D-K4BkyERtnoUn \
+  --role-name <LITELLM_SA_ROLE_NAME> \
   --policy-name InvokeAgentCoreWebSearchGW \
   --policy-document file://iam/litellm-sa-agentcore-policy.json
 ```
@@ -23,7 +30,7 @@ aws iam put-role-policy \
 
 LiteLLM 用 `"模块名.实例名"` 解析 callback。
 
-> ⚠️ **关键(踩过坑，见 [bug #1](#bug-1)）**：LiteLLM `get_instance_fn` 在 `config_file_path`
+> ⚠️ **关键(踩过坑，见 [bug #1](05-issues-and-gotchas.md)）**：LiteLLM `get_instance_fn` 在 `config_file_path`
 > 非空时（proxy 模式恒为 `/app/config/config.yaml`），**强制**去 config.yaml 所在目录
 > （`/app/config`）按相对路径找 `<模块名>.py`，**完全忽略 `PYTHONPATH`**。所以 .py 必须和
 > config.yaml **同目录**。把 .py 单独挂到 `/extra-code` + 设 PYTHONPATH 会 CrashLoop：
@@ -76,7 +83,7 @@ spec:
 ```
 
 > 注：实测时先误按"挂 /extra-code + PYTHONPATH"做，pod CrashLoop；改成本做法（.py 进
-> litellm-config 同目录）后 3 pod 全部 Running。详见 [bug #1](#bug-1)。
+> litellm-config 同目录）后 3 pod 全部 Running。详见 [bug #1](05-issues-and-gotchas.md)。
 
 ### 做法 B（长期）：打进镜像
 

@@ -5,7 +5,7 @@
 
 ---
 
-## bug #1 · PYTHONPATH 方式加载 callback 行不通，pod CrashLoop {#bug-1}
+## bug #1 · PYTHONPATH 方式加载 callback 行不通，pod CrashLoop
 
 **现象**
 按 docs/02 早期写的"做法 A：挂 .py 到 `/extra-code` + 设 `PYTHONPATH=/extra-code`"部署后，
@@ -115,7 +115,7 @@ aws cloudwatch get-metric-statistics --region us-east-1 \
 
 ---
 
-## issue #5 · 开启 AgentCore Gateway 的 vended logs（请求/响应体）{#issue-5}
+## issue #5 · 开启 AgentCore Gateway 的 vended logs（请求/响应体）
 
 **目标**：后端能查到每次搜索的 query 和返回结果。
 

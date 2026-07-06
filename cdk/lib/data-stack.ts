@@ -242,7 +242,7 @@ export class DataStack extends cdk.Stack {
     // Secrets Manager — litellm config secret (separate from RDS).
     //   LITELLM_MASTER_KEY:  auto-generated, never replaced.
     //   REDIS_HOST/PORT:  resolved at deploy time.
-    //   LITELLM_SALT_KEY:  NOT here — auto-generated in its own secret above.
+    //   LITELLM_SALT_KEY:  NOT here — lives in its own secret (created by hand BEFORE first deploy; see the saltSecret comment above).
     //   Everything below tagged CHANGE_ME is a placeholder filled AFTER deploy
     //   by `./scripts/deploy.sh post` (or manual update-secret):
     //     - GENERIC_CLIENT_ID / GENERIC_CLIENT_SECRET: Cognito UI-client

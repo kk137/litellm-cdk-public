@@ -51,7 +51,7 @@ kubectl -n litellm exec $POD -- python3 /tmp/probe.py "test"
 
 ```bash
 aws iam put-role-policy \
-  --role-name litellm-Cluster-ClusterLitellmSaRoleB6A0F44D-K4BkyERtnoUn \
+  --role-name <LITELLM_SA_ROLE_NAME> \
   --policy-name InvokeAgentCoreWebSearchGW \
   --policy-document file://iam/litellm-sa-agentcore-policy.json
 ```
@@ -97,7 +97,7 @@ Snippet: ... AWS Graviton5 processors ... generally available ...
 ### 部署动作（live patch）
 
 1. 把 `agentcore_websearch.py` 放进 `litellm-config` ConfigMap（与 config.yaml 同目录
-   `/app/config`——见 [05 bug #1](05-issues-and-gotchas.md#bug-1)，**不是** PYTHONPATH 方式）。
+   `/app/config`——见 [05 bug #1](05-issues-and-gotchas.md)，**不是** PYTHONPATH 方式）。
 2. config.yaml callbacks：`websearch_interception`（SearXNG）→ `agentcore_websearch.agentcore_websearch_logger`。
 3. deployment 注入 `AGENTCORE_WS_REGION/MCP_URL/TOOL_NAME` env。
 4. `rollout restart` → 3 pod 全 Running，`Application startup complete`（无 ImportError）。
@@ -129,7 +129,7 @@ got 10 result(s), 21288 chars
 
 ### 验证 11 后端日志铁证
 
-开通 gateway vended logs 后（见 [05 issue #5](05-issues-and-gotchas.md#issue-5)），
+开通 gateway vended logs 后（见 [05 issue #5](05-issues-and-gotchas.md)），
 log group `/aws/vendedlogs/bedrock-agentcore/gateway/APPLICATION_LOGS/<AGENTCORE_GATEWAY_ID>`
 记到每次调用的请求体：
 ```json

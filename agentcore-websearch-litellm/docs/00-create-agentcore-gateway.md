@@ -3,8 +3,7 @@
 本篇是 [02 部署到 EKS](02-deploy-to-eks.md) 的**前置步骤**：02–06 都假设
 「AgentCore Web Search Gateway 已存在」，本篇补上「这个 Gateway 怎么从零建出来」。
 
-> 来源：本仓库根目录 `docs/agentcore-websearch-runbook.REAL.docx` 第 2 章（内部运维手册，
-> 含真实值）。本篇保留真实 account / gateway id，供内部复现；对外公开版见 blog 的脱敏一节。
+> 本篇中的 `<ACCOUNT_ID>` / `<AGENTCORE_GATEWAY_ID>` 等是占位符,替换成你自己账号的值即可。
 
 > **环境**：AWS 账号 `<ACCOUNT_ID>` · 区域 `us-east-1`（AgentCore 仅此区可用）。
 

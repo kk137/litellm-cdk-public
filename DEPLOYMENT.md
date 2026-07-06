@@ -122,6 +122,14 @@ npm install            # 首次
 
 ## ③ 部署后收尾与验证
 
+### 先更新 kubeconfig(post 里的 kubectl 步骤依赖它)
+
+```bash
+aws eks update-kubeconfig --name litellm-cluster --region <REGION>
+```
+
+> ⚠️ `deploy-all` 会在最后自动跑一次 `post`。如果那时你还没配 kubeconfig(或 ALB 还在 provisioning),`post` 的 ①(Route53 alias)和 ④(rollout 验证)会打 WARN 跳过——**这不是失败**,配好 kubeconfig 后重跑一次 `./scripts/deploy.sh post` 即可(幂等)。
+
 > `deploy.sh post` 已**自动**做了下面 1–4 步。本节告诉你它做了什么 + 怎么验证。某步 `post` 打 WARN 跳过时,照 [`docs/02-post-deploy-steps.md`](docs/02-post-deploy-steps.md) 手工补。
 
 | 步 | 内容 | post 自动? |
@@ -131,12 +139,6 @@ npm install            # 首次
 | 3 | 建 Cognito admin 用户 + admin group(打印临时密码) | ✅ |
 | 4 | rollout restart litellm + 验证非 CHANGE_ME | ✅ |
 | 5 | 填 Mantle/Gemini key(**仅用 GPT/Gemini 时**) | ❌ 手工 |
-
-### 更新 kubeconfig(跑任何 kubectl 前)
-
-```bash
-aws eks update-kubeconfig --name litellm-cluster --region <REGION>
-```
 
 ### 验证清单
 
@@ -166,7 +168,7 @@ curl -s https://<host-prefix>.<your-domain>/v1/chat/completions \
 
 ## 可选特性(如需才看)
 
-这些默认**关闭**。启用方式:`init` 之后手动编辑 `cdk.context.json` 加对应 flag,再继续 `deploy-cluster`(或直接 `npx cdk deploy litellm-Cluster -c <flag>=...`)。
+这些默认**关闭**。启用方式:`init` 之后手动编辑 `cdk.context.json` 加对应 flag,再继续 `deploy-cluster`。也可直接 `npx cdk deploy litellm-Cluster -c <flag>=...`——但裸跑 cdk 必须**同一条命令钉死 region**(`AWS_REGION=<REGION> CDK_DEFAULT_REGION=<REGION> CDK_DEFAULT_ACCOUNT=<ACCOUNT_ID> npx cdk deploy ...`),否则回落 us-east-1,见 [`docs/03-gotchas.md` #1](docs/03-gotchas.md)。
 
 ### AgentCore Web Search(替代内置 searxng)
 
