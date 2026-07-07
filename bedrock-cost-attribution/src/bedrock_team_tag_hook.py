@@ -98,6 +98,15 @@ class BedrockTeamTagHook(CustomLogger):
         # not the litellm_params 'bedrock/...' id, and custom_llm_provider is not
         # yet resolved — so we cannot reliably detect bedrock here. For non-bedrock
         # backends the injected aws_* keys are simply ignored, so this is safe.
+        # Also tag the Bedrock invocation log itself via requestMetadata, so the
+        # team is queryable in near-real-time from CloudWatch model-invocation
+        # logs (the STS session tag only surfaces in CUR 2.0, hours later).
+        # LiteLLM validates + forwards this into the Converse request body's
+        # top-level `requestMetadata`, which Bedrock records in the log. Only
+        # the Converse path honors it; non-bedrock backends ignore it safely.
+        md = dict(data.get("requestMetadata") or {})
+        md["team"] = _safe_tag_value(team)
+        data["requestMetadata"] = md
         try:
             creds = self._assume_for_team(team)
             data["aws_access_key_id"] = creds["aws_access_key_id"]
