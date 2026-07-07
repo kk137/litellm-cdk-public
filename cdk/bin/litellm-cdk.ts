@@ -41,6 +41,20 @@ const enableBedrockCostAttribution =
   String(app.node.tryGetContext('enableBedrockCostAttribution')).toLowerCase() ===
   'true';
 
+// Bedrock model invocation logging → CloudWatch (metadata only). Off by default.
+// Enable with `-c enableBedrockInvocationLogging=true`. Account+region-level
+// setting; captures ALL Bedrock calls in the region. Pairs with the cost-
+// attribution hook to give near-real-time per-team usage (requestMetadata.team).
+const enableBedrockInvocationLogging =
+  String(app.node.tryGetContext('enableBedrockInvocationLogging')).toLowerCase() ===
+  'true';
+const invocationLogRetentionDaysCtx = app.node.tryGetContext(
+  'invocationLogRetentionDays',
+);
+const invocationLogRetentionDays = invocationLogRetentionDaysCtx
+  ? Number(invocationLogRetentionDaysCtx)
+  : undefined;
+
 const network = new NetworkStack(app, `${projectName}-Network`, {
   env,
   clusterName,
@@ -76,6 +90,8 @@ const cluster = new ClusterStack(app, `${projectName}-Cluster`, {
   hostedZoneId,
   websearchBackend,
   enableBedrockCostAttribution,
+  enableBedrockInvocationLogging,
+  invocationLogRetentionDays,
   description: 'EKS cluster, IAM, Karpenter, Helm charts, k8s manifests',
 });
 cluster.addDependency(data);

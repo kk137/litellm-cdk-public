@@ -8,6 +8,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { KubectlV35Layer } from '@aws-cdk/lambda-layer-kubectl-v35';
 import {
   AwsCustomResource,
@@ -53,6 +54,21 @@ export interface ClusterStackProps extends cdk.StackProps {
    * Off by default — turning it on routes Bedrock calls through AssumeRole.
    */
   readonly enableBedrockCostAttribution?: boolean;
+  /**
+   * Enable Bedrock model invocation logging → CloudWatch (metadata only, no
+   * prompt/response bodies). Creates the `/aws/bedrock/model-invocations` log
+   * group, an IAM role Bedrock assumes to write it, and sets the account-level
+   * logging config for this region (there's no native CFN resource, so an
+   * AwsCustomResource calls PutModelInvocationLoggingConfiguration).
+   *
+   * This is an ACCOUNT+REGION-level Bedrock setting, not per-stack: enabling it
+   * captures ALL Bedrock calls in the region (not just litellm's), and the log
+   * records carry `requestMetadata.team` when the cost-attribution hook is on —
+   * giving near-real-time per-team usage from CloudWatch. Off by default.
+   */
+  readonly enableBedrockInvocationLogging?: boolean;
+  /** CloudWatch retention (days) for the invocation log group. Default 90. */
+  readonly invocationLogRetentionDays?: number;
 }
 
 /**
@@ -544,6 +560,96 @@ export class ClusterStack extends cdk.Stack {
       new cdk.CfnOutput(this, 'BedrockExecRoleArn', {
         value: bedrockExecRole.roleArn,
       });
+    }
+
+    // ------------------------------------------------------------
+    // Bedrock model invocation logging → CloudWatch (metadata only).
+    //
+    // Account+region-level Bedrock setting; no native CFN resource exists, so
+    // an AwsCustomResource calls Put/Delete ModelInvocationLoggingConfiguration.
+    // Pairs with the cost-attribution hook: log records carry requestMetadata.team,
+    // giving near-real-time per-team usage from CloudWatch (CUR is hours late).
+    // ------------------------------------------------------------
+    if (props.enableBedrockInvocationLogging) {
+      const invocationLogGroup = new logs.LogGroup(this, 'BedrockInvocationLogGroup', {
+        logGroupName: '/aws/bedrock/model-invocations',
+        retention:
+          (props.invocationLogRetentionDays as logs.RetentionDays) ??
+          logs.RetentionDays.THREE_MONTHS,
+        // RETAIN so tearing down the stack never drops invocation history.
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
+
+      // Role Bedrock assumes to write the log group (SourceAccount-scoped trust).
+      const bedrockLogRole = new iam.Role(this, 'BedrockInvocationLogRole', {
+        roleName: `${props.projectName}-bedrock-invocation-logging`,
+        assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com', {
+          conditions: { StringEquals: { 'aws:SourceAccount': this.account } },
+        }),
+        description: 'Bedrock model invocation logging to CloudWatch',
+      });
+      bedrockLogRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+          resources: [`${invocationLogGroup.logGroupArn}:*`],
+        }),
+      );
+
+      // The logging config to set (metadata only — textData/image/embedding off).
+      const loggingConfig = {
+        cloudWatchConfig: {
+          logGroupName: invocationLogGroup.logGroupName,
+          roleArn: bedrockLogRole.roleArn,
+        },
+        textDataDeliveryEnabled: false,
+        imageDataDeliveryEnabled: false,
+        embeddingDataDeliveryEnabled: false,
+      };
+      const setLogging = new AwsCustomResource(this, 'SetBedrockInvocationLogging', {
+        // Bedrock logging APIs are in Lambda's built-in SDK; don't fetch latest.
+        installLatestAwsSdk: false,
+        onCreate: {
+          service: 'Bedrock',
+          action: 'putModelInvocationLoggingConfiguration',
+          parameters: { loggingConfig },
+          physicalResourceId: PhysicalResourceId.of(
+            `bedrock-invocation-logging-${this.region}`,
+          ),
+        },
+        onUpdate: {
+          service: 'Bedrock',
+          action: 'putModelInvocationLoggingConfiguration',
+          parameters: { loggingConfig },
+          physicalResourceId: PhysicalResourceId.of(
+            `bedrock-invocation-logging-${this.region}`,
+          ),
+        },
+        onDelete: {
+          // Turn logging back off so a stack delete leaves no dangling config
+          // pointing at a (RETAIN'd but role-less) setup.
+          service: 'Bedrock',
+          action: 'deleteModelInvocationLoggingConfiguration',
+        },
+        policy: AwsCustomResourcePolicy.fromStatements([
+          new iam.PolicyStatement({
+            actions: [
+              'bedrock:PutModelInvocationLoggingConfiguration',
+              'bedrock:DeleteModelInvocationLoggingConfiguration',
+              'bedrock:GetModelInvocationLoggingConfiguration',
+            ],
+            resources: ['*'],
+          }),
+          // PutModelInvocationLoggingConfiguration validates it can write the
+          // log group by (implicitly) checking the role — needs iam:PassRole.
+          new iam.PolicyStatement({
+            actions: ['iam:PassRole'],
+            resources: [bedrockLogRole.roleArn],
+          }),
+        ]),
+      });
+      // Role + log group must exist (and IAM must propagate) before the Put.
+      setLogging.node.addDependency(bedrockLogRole);
+      setLogging.node.addDependency(invocationLogGroup);
     }
 
     // ============================================================
