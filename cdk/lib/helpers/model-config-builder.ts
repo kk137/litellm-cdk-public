@@ -101,6 +101,25 @@ const BEDROCK_MODELS: BedrockModel[] = [
 ];
 
 const MANTLE_MODELS: StaticModel[] = [
+  // GPT-5.6 family (GA 2026-07-13, Responses-only, 272K ctx, no geo/global CRIS,
+  // in-region only). Sol=flagship; Terra=GPT-5.5 perf @ half cost; Luna=cheapest.
+  // Endpoint pinned to us-east-2 (same as gpt-5.5/5.4); non-US clusters reach it
+  // cross-region. Pricing per AWS Bedrock pricing page (matches OpenAI rates).
+  {
+    name: 'gpt-5.6-sol',
+    litellmParams: { model: 'openai/openai.gpt-5.6-sol', api_base: 'https://bedrock-mantle.us-east-2.api.aws/openai/v1', api_key: 'os.environ/BEDROCK_MANTLE_API_KEY', drop_params: true },
+    modelInfo: { max_input_tokens: 272000, input_cost_per_token: 0.000005, input_cost_per_token_cache_hit: 0.0000005, output_cost_per_token: 0.00003 },
+  },
+  {
+    name: 'gpt-5.6-terra',
+    litellmParams: { model: 'openai/openai.gpt-5.6-terra', api_base: 'https://bedrock-mantle.us-east-2.api.aws/openai/v1', api_key: 'os.environ/BEDROCK_MANTLE_API_KEY', drop_params: true },
+    modelInfo: { max_input_tokens: 272000, input_cost_per_token: 0.0000025, input_cost_per_token_cache_hit: 0.00000025, output_cost_per_token: 0.000015 },
+  },
+  {
+    name: 'gpt-5.6-luna',
+    litellmParams: { model: 'openai/openai.gpt-5.6-luna', api_base: 'https://bedrock-mantle.us-east-2.api.aws/openai/v1', api_key: 'os.environ/BEDROCK_MANTLE_API_KEY', drop_params: true },
+    modelInfo: { max_input_tokens: 272000, input_cost_per_token: 0.000001, input_cost_per_token_cache_hit: 0.0000001, output_cost_per_token: 0.000006 },
+  },
   {
     name: 'gpt-5.5',
     litellmParams: { model: 'openai/openai.gpt-5.5', api_base: 'https://bedrock-mantle.us-east-2.api.aws/openai/v1', api_key: 'os.environ/BEDROCK_MANTLE_API_KEY', drop_params: true },
