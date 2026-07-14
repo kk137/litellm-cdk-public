@@ -289,6 +289,12 @@ export function buildLitellmConfig(opts: BuildConfigOptions): string {
         ...(opts.enableBedrockCostAttribution
           ? ['bedrock_team_tag_hook.bedrock_team_tag_hook_instance']
           : []),
+        // Codex (>=26.707 "Responses Lite") packs tools into a non-standard
+        // {type:"additional_tools"} input item that Bedrock Mantle rejects
+        // (400 "Invalid 'input'"; Codex issue #32086). This hook flattens it
+        // into top-level `tools` in async_pre_call_hook. Always on: non-Codex
+        // requests pass through untouched (no additional_tools item present).
+        'codex_additional_tools_flatten.codex_additional_tools_flatten_instance',
         'prometheus',
         websearchBackend === 'agentcore'
           ? 'agentcore_websearch.agentcore_websearch_logger'

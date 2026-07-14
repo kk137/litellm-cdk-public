@@ -1193,6 +1193,21 @@ function addLitellmManifests(scope: Construct, cluster: eks.Cluster, props: Mani
   // callback module relative to the config-file dir (/app/config), ignoring
   // PYTHONPATH — so the .py MUST live next to config.yaml in the same mount.
   const configData: Record<string, string> = { 'config.yaml': litellmConfigYaml };
+  // Codex additional_tools flatten hook — always shipped (its callback is added
+  // unconditionally in model-config-builder). Rewrites Codex's non-standard
+  // {type:"additional_tools"} input item into top-level `tools` so Bedrock
+  // Mantle accepts the body. No-op for non-Codex requests. See Codex issue #32086.
+  configData['codex_additional_tools_flatten.py'] = fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      '..',
+      'codex-flatten',
+      'src',
+      'codex_additional_tools_flatten.py',
+    ),
+    'utf8',
+  );
   if (websearchBackend === 'agentcore') {
     configData['agentcore_websearch.py'] = fs.readFileSync(
       path.join(
